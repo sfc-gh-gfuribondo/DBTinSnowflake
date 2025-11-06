@@ -11,21 +11,108 @@ USE DATABASE DBT_DEMO_DB;
 USE WAREHOUSE DBT_DEMO_WH;
 
 -- ============================================================================
--- SECTION 1: Create a dbt Project Object from Git
+-- SECTION 1: Setup Git Integration and Create dbt Project
 -- ============================================================================
--- Note: First you need to create a dbt project object in Snowflake
--- This requires a Git repository with your dbt project
+-- GitHub Repository: https://github.com/sfc-gh-gfuribondo/DBTinSnowflake
+-- This dbt project is now published and ready to use in Snowflake!
+-- ============================================================================
 
--- Example: Create a dbt project from a Git repository
--- (Uncomment and modify for your repository)
-/*
+-- Step 1.1: Create API Integration for GitHub
+CREATE OR REPLACE API INTEGRATION GIT_API_INTEGRATION_GITHUB
+  API_PROVIDER = git_https_api
+  API_ALLOWED_PREFIXES = ('https://github.com/sfc-gh-gfuribondo/')
+  ENABLED = TRUE
+  COMMENT = 'API Integration for GitHub - dbt demo repository';
+
+-- Verify API Integration was created
+DESCRIBE INTEGRATION GIT_API_INTEGRATION_GITHUB;
+
+-- Step 1.2: Create Git Repository Object (Public Repo - No Auth Required)
+-- This connects to the published dbt project repository
+CREATE OR REPLACE GIT REPOSITORY DBT_DEMO_DB.PUBLIC.MY_DBT_GIT_REPO
+  API_INTEGRATION = GIT_API_INTEGRATION_GITHUB
+  ORIGIN = 'https://github.com/sfc-gh-gfuribondo/DBTinSnowflake'
+  COMMENT = 'dbt + Snowflake demo project - Complete analytics pipeline';
+
+-- Step 1.3: Fetch the repository content
+ALTER GIT REPOSITORY DBT_DEMO_DB.PUBLIC.MY_DBT_GIT_REPO FETCH;
+
+-- Step 1.4: Verify repository content - List files in main branch
+LS @DBT_DEMO_DB.PUBLIC.MY_DBT_GIT_REPO/branches/main;
+
+-- Step 1.5: Verify dbt_project.yml exists
+SELECT $1 FROM @DBT_DEMO_DB.PUBLIC.MY_DBT_GIT_REPO/branches/main/dbt_project.yml;
+
+-- Step 1.6: Show all branches available
+SHOW BRANCHES IN GIT REPOSITORY DBT_DEMO_DB.PUBLIC.MY_DBT_GIT_REPO;
+
+-- Step 1.7: Create dbt Project Object from the Git Repository
 CREATE OR REPLACE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
-  FROM GIT REPOSITORY my_git_integration
-  PATH '/dbt_project';
-*/
+  FROM GIT REPOSITORY DBT_DEMO_DB.PUBLIC.MY_DBT_GIT_REPO
+  GIT_BRANCH = 'main'
+  COMMENT = 'Production dbt project - Analytics for customers, orders, products';
+
+-- Step 1.8: Verify dbt project was created
+DESCRIBE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT;
+
+-- Step 1.9: Show all versions (commits) available
+SHOW VERSIONS IN DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT;
+
+-- Step 1.10: Test the dbt project connection
+EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  ARGS = 'debug';
 
 -- ============================================================================
--- SECTION 2: Basic EXECUTE DBT PROJECT Commands
+-- CONGRATULATIONS! Your dbt project is now connected to Git and ready to use!
+-- The following sections show you how to execute various dbt commands.
+-- ============================================================================
+
+-- ============================================================================
+-- SECTION 2: First Steps - Run the Complete Demo
+-- ============================================================================
+-- Now that your dbt project is connected, let's run the complete demo!
+-- This will load seed data, build models, and run tests.
+-- ============================================================================
+
+-- Step 2.1: Load seed data (CSV files)
+-- This loads customers, orders, and products data
+EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  ARGS = 'seed --target dev';
+
+-- Step 2.2: Build all models (staging + marts)
+-- This creates views and tables in Snowflake
+EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  ARGS = 'run --target dev';
+
+-- Step 2.3: Run all tests
+-- This validates data quality
+EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  ARGS = 'test --target dev';
+
+-- Step 2.4: Generate documentation
+EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  ARGS = 'docs generate --target dev';
+
+-- Step 2.5: Verify results - Query the marts tables
+SELECT * FROM DBT_DEMO_DB.PUBLIC_MARTS.CUSTOMER_ORDERS 
+WHERE FULL_NAME IS NOT NULL 
+ORDER BY TOTAL_SPENT DESC LIMIT 5;
+
+SELECT * FROM DBT_DEMO_DB.PUBLIC_MARTS.ORDER_SUMMARY 
+WHERE ORDER_MONTH IS NOT NULL 
+ORDER BY ORDER_MONTH DESC LIMIT 5;
+
+SELECT * FROM DBT_DEMO_DB.PUBLIC_MARTS.PRODUCT_PERFORMANCE 
+WHERE PRODUCT_ID IS NOT NULL 
+ORDER BY TOTAL_INVENTORY_VALUE DESC LIMIT 5;
+
+-- ============================================================================
+-- SUCCESS! Your dbt project is now fully deployed and tested.
+-- Continue to the sections below for more advanced usage examples.
+-- ============================================================================
+
+-- ============================================================================
+-- SECTION 3: Basic EXECUTE DBT PROJECT Commands
 -- ============================================================================
 
 -- Example 1: Execute default dbt run command
@@ -43,7 +130,7 @@ EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
   ARGS = 'run --target prod';
 
 -- ============================================================================
--- SECTION 3: Model Selection Examples
+-- SECTION 4: Model Selection Examples
 -- ============================================================================
 
 -- Example 4: Run specific models only
@@ -77,7 +164,7 @@ EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
   ARGS = 'run --select +customer_orders+ --target dev';
 
 -- ============================================================================
--- SECTION 4: Different dbt Commands
+-- SECTION 5: Different dbt Commands
 -- ============================================================================
 
 -- Example 10: Execute dbt seed command
@@ -116,7 +203,7 @@ EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
   ARGS = 'compile --target dev';
 
 -- ============================================================================
--- SECTION 5: Advanced Options
+-- SECTION 6: Advanced Options
 -- ============================================================================
 
 -- Example 17: Full refresh (rebuild from scratch)
@@ -140,7 +227,7 @@ EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
   ARGS = 'run --select state:modified+ --target dev';
 
 -- ============================================================================
--- SECTION 6: Subdirectory Projects
+-- SECTION 7: Subdirectory Projects
 -- ============================================================================
 
 -- Example 21: Execute dbt project in subdirectory
@@ -155,7 +242,7 @@ EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_PARENT_PROJECT
   PROJECT_ROOT = 'subdirectory/project2';
 
 -- ============================================================================
--- SECTION 7: Workspace Execution (Alternative Syntax)
+-- SECTION 8: Workspace Execution (Alternative Syntax)
 -- ============================================================================
 
 -- Example 23: Execute from workspace
@@ -168,7 +255,7 @@ EXECUTE DBT PROJECT FROM WORKSPACE user$.public."My dbt Project Workspace"
   ARGS = 'build --select marts.* --target prod';
 
 -- ============================================================================
--- SECTION 8: Capturing and Analyzing Results
+-- SECTION 9: Capturing and Analyzing Results
 -- ============================================================================
 
 -- Example 25: Execute and capture results in a variable
@@ -197,7 +284,7 @@ FROM (
 );
 
 -- ============================================================================
--- SECTION 9: Production Scheduling with Tasks
+-- SECTION 10: Production Scheduling with Tasks
 -- ============================================================================
 
 -- Example 27: Create scheduled task to run dbt daily
@@ -251,7 +338,7 @@ ORDER BY SCHEDULED_TIME DESC
 LIMIT 10;
 
 -- ============================================================================
--- SECTION 10: Error Handling and Monitoring
+-- SECTION 11: Error Handling and Monitoring
 -- ============================================================================
 
 -- Example 32: Execute with error handling
@@ -277,7 +364,7 @@ EXECUTE DBT PROJECT IF EXISTS DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
   ARGS = 'run --target dev';
 
 -- ============================================================================
--- SECTION 11: Querying Results and Artifacts
+-- SECTION 12: Querying Results and Artifacts
 -- ============================================================================
 
 -- Example 34: Parse execution results
@@ -313,7 +400,7 @@ SELECT
 FROM execution;
 
 -- ============================================================================
--- SECTION 12: Management Commands
+-- SECTION 13: Management Commands
 -- ============================================================================
 
 -- Example 36: Show all dbt projects
@@ -329,7 +416,7 @@ DESCRIBE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT;
 SHOW VERSIONS IN DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT;
 
 -- ============================================================================
--- SECTION 13: Real-World Production Workflow
+-- SECTION 14: Real-World Production Workflow
 -- ============================================================================
 
 -- Example 40: Complete production workflow
@@ -360,7 +447,40 @@ SELECT * FROM DBT_DEMO_DB.PUBLIC_MARTS.CUSTOMER_ORDERS LIMIT 5;
 SELECT * FROM DBT_DEMO_DB.PUBLIC_MARTS.ORDER_SUMMARY LIMIT 5;
 
 -- ============================================================================
--- SECTION 14: Cleanup Commands
+-- SECTION 15: Updating from Git Repository
+-- ============================================================================
+
+-- When you make changes to your GitHub repository, update Snowflake:
+
+-- Step 15.1: Fetch latest changes from Git
+ALTER GIT REPOSITORY DBT_DEMO_DB.PUBLIC.MY_DBT_GIT_REPO FETCH;
+
+-- Step 15.2: Verify new commits are available
+SHOW VERSIONS IN DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT;
+
+-- Step 15.3: The dbt project automatically uses the latest main branch
+-- Just re-execute to use the updated code
+EXECUTE DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  ARGS = 'run --target dev';
+
+-- Step 15.4: Switch to a different branch if needed
+ALTER DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  SET GIT_BRANCH = 'develop';
+
+-- Step 15.5: Or use a specific tag/release
+ALTER DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  SET GIT_TAG = 'v1.0.0';
+
+-- Step 15.6: Or pin to a specific commit
+ALTER DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  SET GIT_COMMIT = '98ee86c...';
+
+-- Step 15.7: Return to main branch
+ALTER DBT PROJECT DBT_DEMO_DB.PUBLIC.MY_DBT_PROJECT
+  SET GIT_BRANCH = 'main';
+
+-- ============================================================================
+-- SECTION 16: Cleanup Commands
 -- ============================================================================
 
 -- Example 41: Stop all tasks
