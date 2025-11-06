@@ -1,0 +1,46 @@
+version: 2
+
+models:
+  - name: customer_orders
+    description: Customer-level aggregation with order metrics
+    columns:
+      - name: customer_id
+        description: Primary key
+        tests:
+          - unique
+          - not_null
+      - name: total_orders
+        description: Total number of orders placed by customer
+      - name: total_spent
+        description: Total amount spent by customer
+      - name: avg_order_value
+        description: Average order value for customer
+
+  - name: order_summary
+    description: Monthly order summary by status
+    columns:
+      - name: order_month
+        description: Month of orders
+        tests:
+          - not_null
+      - name: status
+        description: Order status
+        tests:
+          - not_null
+      - name: total_revenue
+        description: Total revenue for the month and status
+
+  - name: product_performance
+    description: Product-level metrics and inventory status
+    columns:
+      - name: product_id
+        description: Primary key
+        tests:
+          - unique
+          - not_null
+      - name: stock_level
+        description: Categorized stock level
+        tests:
+          - accepted_values:
+              values: ['Low Stock', 'Medium Stock', 'High Stock']
+

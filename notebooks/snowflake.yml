@@ -1,0 +1,11 @@
+definition_version: "2"
+entities:
+  dbt_package_lister:
+    type: notebook
+    identifier:
+      name: dbt_package_lister
+    artifacts:
+      - dbt_package_lister.ipynb
+    notebook_file: dbt_package_lister.ipynb
+    query_warehouse: DBT_DEMO_WH
+
